@@ -1,0 +1,78 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "partnerId": {
+      "type": "string",
+      "metadata": {
+        "displayName": "Atos Partner Id",
+        "description": "A valid and active Microsoft Partmer id to be linked to the target tenant"
+      }
+    },
+    "userAssignedManagedIdentityName": {
+      "metadata": {
+        "displayName": "User Assigned Managed Identity Name",
+        "description": "Specify the name for the User Assigned Managed Identity"
+      },
+      "type": "string",
+      "defaultValue": null
+    },
+    "managedIdentityResourceGroupName": {
+      "metadata": {
+        "displayName": "Resource Group name where the managed identity resides",
+        "description": "The name of the resource group containing the user assigned managed identity."
+      },
+      "type": "string",
+      "defaultValue": null
+    },
+    "forceUpdateTagValue": {
+      "type": "string",
+      "defaultValue": "[Guid(utcNow('u'))]",
+      "metadata": {
+        "description": "Generated unique name for a JobSchedule connecting a schedule to an automation runbook."
+      }
+    }
+  },
+  "variables": {
+    "location": "[resourceGroup().location]",
+    "identityId": "[concat('/subscriptions/',subscription().subscriptionId,'/resourceGroups/', parameters('managedIdentityResourceGroupName'), '/providers/Microsoft.ManagedIdentity/userAssignedIdentities/',parameters('userAssignedManagedIdentityName'))]",
+    "blueprintGeneratorParameters": {
+      "Atos-DCS-core-customer-management": {
+        "artifactDescription": "4) Customer PAL Activation",
+        "resourceGroups": [
+          "monitoringRG"
+        ]
+      }
+    },
+    "resourceTags": {
+      "AtosManaged": "AtosAutomation"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Resources/deploymentScripts",
+      "apiVersion": "2019-10-01-preview",
+      "name": "New-AtosCustomerPAL",
+      "location": "[variables('location')]",
+      "kind": "AzurePowerShell",
+      "tags": "[variables('resourceTags')]",
+      "identity": {
+        "type": "userAssigned",
+        "userAssignedIdentities": {
+          "[variables('identityId')]": {
+          }
+        }
+      },
+      "properties": {
+        "forceUpdateTag": "[parameters('forceUpdateTagValue')]",
+        "azPowerShellVersion": "3.0",
+        "azCliVersion": "2.0.80",
+        "arguments": "[concat(' -PartnerId ', parameters('PartnerId'), ' -SubscriptionId ', subscription().subscriptionId)]",
+        "scriptContent": "param([Parameter(Mandatory=$True)] [string]$SubscriptionId,[Parameter(Mandatory=$True)] [string]$PartnerId);Install-Module-NameAz.ManagedServiceIdentity-RequiredVersion0.7.3-Force-AllowClobber;Install-Module-NameAz.ManagementPartner-RequiredVersion0.7.2-Force-AllowClobber;Select-AzSubscription-SubscriptionId$SubscriptionId;;$pal_object=Get-AzManagementPartner-PartnerId$PartnerId-ErrorActionSilentlyContinue;;if(-not$pal_object){Write-Host'CreatingPAL';New-AzManagementPartner-PartnerId$PartnerId-ErrorActionStop}else{Write-Host'UpdatingPAL';Update-AzManagementPartner-PartnerId$PartnerId-ErrorActionStop}",
+        "timeout": "PT30M",
+        "cleanupPreference": "OnSuccess",
+        "retentionInterval": "PT1H"
+      }
+    }
+  ]
+}
